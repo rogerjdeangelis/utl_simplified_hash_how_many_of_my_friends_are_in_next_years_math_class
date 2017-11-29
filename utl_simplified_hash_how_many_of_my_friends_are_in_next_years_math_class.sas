@@ -133,4 +133,61 @@ data want;
 run;quit;
 
 
+%macro utl_hash(
+    roster=         /* math class roster */
+   ,friends_key=  /* list of friends_namess  for lookup */
+   ,want=           /* list of space delimited variable to add to matched friends_names */
+   ,friends=        /* master large dataset that holds all friends_names and age sex */
+   );
+
+   * Chang Chung;
+   %put %sysfunc(ifc(%sysevalf(%superq(roster       )=,boolean) ,ERROR: Please Provide roster,));
+   %put %sysfunc(ifc(%sysevalf(%superq(friends_key  )=,boolean) ,ERROR: Please Provide fiends key(s) ,));
+   %put %sysfunc(ifc(%sysevalf(%superq(want         )=,boolean) ,ERROR: Please Provivde dataset with a list of friends ,));
+   %put %sysfunc(ifc(%sysevalf(%superq(friends      )=,boolean) ,ERROR: Please Provide friends ,));
+
+    %let res= %eval
+    (
+        %sysfunc(ifc(%sysevalf(%superq( roster       )=,boolean),1,0))
+      + %sysfunc(ifc(%sysevalf(%superq( friends_key  )=,boolean),1,0))
+      + %sysfunc(ifc(%sysevalf(%superq( want         )=,boolean),1,0))
+      + %sysfunc(ifc(%sysevalf(%superq( friends      )=,boolean),1,0))
+    );
+    %if &res = 0 %then %do;
+     %local idx ;
+     if _n_=1 then do;
+        drop rc;
+        if _n_=0 then set &roster;
+        declare hash hsh(dataset:"&roster");
+          rc = hsh.definekey(
+          %do idx=1 %to %eval(%sysfunc(countw(&friends_names))-1);
+             "%scan(&friends_key,&idx)",
+          %end;
+          "%scan(&friends_key,&idx)"
+          );
+          %do idx=1 %to %sysfunc(countw(&want));
+             rc = hsh.definedata("%scan(&want,&idx)");
+          %end;
+          rc = hsh.definedone();
+      end;
+      set &friends;
+       rc = hsh.find();
+       if rc then do;
+          put  &friends_key " is not in my &roster " (&want) (= $ );
+          flag=0;
+       end;
+     else do;
+        put &friends_key " is in my &roster "  (&want) (= $ );
+        flag=1;
+    end;
+    drop rc;
+    run;
+  %end;
+  %else %do;
+    %put "Unable to compile HASH object due to ERRORs above";
+  %end;
+
+%mend utl_hash;
+
+
 
